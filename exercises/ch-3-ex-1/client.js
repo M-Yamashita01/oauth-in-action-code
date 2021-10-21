@@ -97,6 +97,27 @@ app.get('/callback', function(req, res){
 });
 
 app.get('/fetch_resource', function(req, res) {
+  if (!access_token) {
+    res.render('error', {error: 'Missing access token.'});
+    return;
+  }
+
+  var headers = {
+    'Authorization': 'Bearer ' + access_token
+  };
+
+  var resource = request('POST', protectedResource, { headers: headers});
+
+  if (resource.statusCode >= 200 && resource.statusCode < 300) {
+    var body = JSON.parse(resource.getBody());
+
+    res.render('data', { resource: body });
+    return;
+  }
+  else {
+    res.render('error', { error: 'Server returned response code: ' + resource.statusCode});
+    return;
+  }
 
 	/*
 	 * Use the access token to call the resource server
