@@ -6,6 +6,7 @@ var cons = require('consolidate');
 var nosql = require('nosql').load('database.nosql');
 var querystring = require('querystring');
 var __ = require('underscore');
+const { access } = require("fs");
 __.string = require('underscore.string');
 
 var app = express();
@@ -26,7 +27,11 @@ var authServer = {
 
 // client information
 var clients = [
-
+  {
+    "client_id": "oauth-client-1",
+    "client_secret": "oauth-client-secret-1",
+    "redirect_uris": ["http://localhost:9000/callback"]
+  },
   /*
    * Enter client information here
    */
@@ -45,23 +50,112 @@ app.get('/', function(req, res) {
 });
 
 app.get("/authorize", function(req, res){
-	
-	/*
-	 * Process the request, validate the client, and send the user to the approval page
-	 */
-	
+  var client = getClient(req.query.client_id);
+  if (!client) {
+    res.render('error', { error: 'Unknown client' });
+    return;
+  } else if (!__.contains(client.redirect_uris, req.query.redirect_uri)) {
+    res.render('error', { error: 'Invalid redirect URI' });
+    return;
+  }
+
+  var reqid = randomstring.generate(8);
+  requests[reqid] = req.query;
+
+  res.render('approve', { client: client, reqid: reqid });
+  return;
 });
 
 app.post('/approve', function(req, res) {
+  var reqid = req.body.reqid;
+  var query = requests[reqid];
+  delete requests[reqid];
 
-	/*
-	 * Process the results of the approval page, authorize the client
-	 */
-	
+  if (!query) {
+    res.render('error', { error: 'No matching authorization request' });
+    return;
+  }
+
+  if (req.body.approve) {
+    if (query.response_type == 'code') {
+      var code = randomstring.generate(8);
+      codes[code] = { request: query };
+      var urlParsed = buildUrl(query.redirect_uri, {
+        code: code,
+        state: query.state
+      });
+      res.redirect(urlParsed);
+      return;
+    } else {
+      var urlParsed = buildUrl(query.redirect_uri, {
+        error: 'unsupported_response_type'
+      });
+      res.redirect(urlParsed);
+      return;
+    }
+
+  } else {
+    var urlParsed = buildUrl(query.redirect_uri, {
+      error: 'access_denied'
+    });
+    res.redirect(urlParsed);
+    return;
+  }
 });
 
 app.post("/token", function(req, res){
+  var auth = req.headers['authorization'];
+  if (auth) {
+    var clientCredentials = decodeClientCredentials(auth);
+    var clientId = clientCredentials.id;
+    var clientSecret = clientCredentials.secret;
+  }
 
+  if (req.body.client_id) {
+    if (clientId) {
+      res.status(401).json({error: 'invalid_client'});
+      return;
+    }
+    var clientId = req.body.client_id;
+    var clientSecret = req.body.client_secret;
+  }
+
+  var client = getClient(clientId);
+  if (!client) {
+    res.status(401).json({ error: 'invalid_client'} );
+    return;
+  }
+
+  if (client.client_secret != clientSecret) {
+    res.status(401).json({ error: 'invalid_client'} );
+    return;
+  }
+
+  if (req.body.grant_type == 'authorization_code') {
+    var code = codes[req.body.code];
+    if (code) {
+      delete codes[req.body.code];
+      if (code.request.client_id == clientId) {
+        var access_token = randomstring.generate();
+        nosql.insert({ access_token: access_token, client_id: clientId });
+        var token_response = {
+          access_token: access_token,
+          token_type: 'Bearer'
+        }
+        res.status(200).json(token_response);
+      } else {
+        res.status(400).json({ error: 'invalid_grant' });
+        return;
+      }
+    } else {
+      res.status(400).json({ error: 'invalid_grant' });
+      return;
+    }
+    
+  } else {
+    res.status(400).json({ error: 'unsupported_grant_type'} );
+    return;
+  }
 	/*
 	 * Process the request, issue an access token
 	 */
