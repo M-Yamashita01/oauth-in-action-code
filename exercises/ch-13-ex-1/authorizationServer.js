@@ -238,6 +238,32 @@ app.post("/token", function(req, res){
 
 				var token_response = { access_token: access_token, token_type: 'Bearer',  scope: cscope };
 
+        if (__.contains(code.scope, 'openid') && code.user) {
+          var header = {
+            'typ': 'JWT',
+            'alg': rsaKey.alg,
+            'kid': rsaKey.kid
+          };
+
+          var ipayload = {
+            iss: 'http://localhost:9001',
+            sub: code.user.sub,
+            aud: client.client_id,
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + (5 * 60),
+          };
+
+          if (code.request.nonce) {
+            ipayload.nonce = code.request.nonce;
+          }
+
+          var privateKey = jose.KEYUTIL.getKey(rsaKey);
+          var id_token = jose.jws.JWS.sign(header.alg, JSON.stringify(header), JSON.stringify(ipayload), privateKey);
+
+          token_response.id_token = id_token;
+        }
+
+
 				/*
 				 * Generate an ID token, if necessary
 				 */

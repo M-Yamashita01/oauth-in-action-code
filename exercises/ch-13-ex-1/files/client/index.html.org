@@ -37,23 +37,11 @@
     <div class="container">
 
       <div class="jumbotron">
-		  <p>Logged in user subject <span class="label label-info"><%- id_token ? id_token.sub : 'NONE' %></span> from issuer <span class="label label-warning"><%- id_token ? id_token.iss : 'NONE' %></span>.
-		  <p>User information:
-			  <% if (userInfo) { %>
-				  <ul>
-					  <% _.each(userInfo, function(value, key, list) { %>
-					  
-					  	<li><b><%- key %></b>: <%- value %></li>
-					  
-					  <% }); %>
-				  </ul>
-		      <% } else { %>
-				  <span class="label label-danger">NOT FETCHED</span>
-			  <% } %>
-		  </p>
-		  
-		  <a class="btn btn-default" href="/authorize">Log In</a> 
-		  <a class="btn btn-default" href="/userinfo">Get User Information</a> 
+		  <p>Access token value: <span class="label label-danger"><%- access_token ? access_token : 'NONE' %></span></p>
+		  <p>Scope value: <span class="label label-danger"><%- scope ? scope : 'NONE' %></span></p>
+		  <p>Refresh token value: <span class="label label-danger"><%- refresh_token ? refresh_token : 'NONE' %></span></p>
+		  <a class="btn btn-default" href="/authorize">Get OAuth Token</a> 
+		  <a class="btn btn-default" href="/fetch_resource">Get Protected Resource</a> 
       </div>
 
     </div><!-- /.container -->
