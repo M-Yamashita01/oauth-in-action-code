@@ -116,6 +116,8 @@ app.get("/callback", function(req, res){
 		scope = body.scope;
 		console.log('Got scope: %s', scope);
 
+    key = body.access_token_key;
+    alg = body.alg;
 		/*
 		 * Save the access token key
 		 */
@@ -133,11 +135,27 @@ app.get('/fetch_resource', function(req, res) {
 		return;
 	}
 	
+  var header = {
+    'typ': 'PoP',
+    'alg': alg,
+    'key': key.kid
+  };
+
+  var payload = {};
+  payload.at = access_token;
+  payload.ts = Math.floor(Date.now() / 1000);
+  payload.m = 'POST';
+  payload.u = 'localhost:9002'
+  payload.p = '/resource'
+
+  var privateKey = jose.KEYUTIL.getKey(key);
+  var signed = jose.jws.JWS.sign(alg, JSON.stringify(header), JSON.stringify(payload), privateKey);
 	/*
 	 * Create a signed HTTP object and add it to the headers of the request
 	 */
 
 	var headers = {
+    'Authorization': 'PoP ' + signed,
 		'Content-Type': 'application/x-www-form-urlencoded'
 	};
 	

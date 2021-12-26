@@ -8,6 +8,7 @@ var querystring = require('querystring');
 var __ = require('underscore');
 __.string = require('underscore.string');
 var jwk = require('node-jose');
+const { access } = require("fs");
 
 var app = express();
 
@@ -197,6 +198,31 @@ app.post("/token", function(req, res){
 			delete codes[req.body.code]; // burn our code, it's been used
 			if (code.request.client_id == clientId) {
 
+        keystore.generate('RSA', 2048).then(function(key) {
+          var access_token = randomstring.generate();
+          var access_token_key = key.toJSON(true);
+          var access_token_public_key = key.toJSON();
+
+          var token_response = {
+            access_token: access_token,
+            access_token_key: access_token_key,
+            token_type: 'PoP',
+            refresh_token: req.body.refresh_token,
+            scope: code.scope,
+            alg: 'RS256'
+          };
+
+          nosql.insert({
+            access_token: access_token,
+            access_token_key: access_token_public_key,
+            client_id: clientId,
+            scope: code.scope
+          });
+
+          res.status(200).json(token_response);
+          console.log('Issued tokens for code %s', req.body.code);
+          return;
+        });
 				/*
 				 * Generate an access token and associated key, store them, and return them
 				 */
@@ -257,6 +283,8 @@ app.post('/introspect', function(req, res) {
   			/*
   			 * Add in the key and algorithm associated with the token to the introspection response
   			 */
+
+        introspectionResponse.access_token_key = token.access_token_key;
 						
   			res.status(200).json(introspectionResponse);
   			return;
